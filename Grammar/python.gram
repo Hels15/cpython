@@ -659,6 +659,19 @@ type_param[type_param_ty] (memo):
 
 type_param_bound[expr_ty]: ':' e=expression { e }
 
+# shorthand keyword arguments
+#--------------------------
+
+shorthand_keyword_args[asdl_shorthand_keyword_arg_seq*]: t=shorthand_keyword_seq {
+    # stuff here
+    CHECK_VERSION(asdl_shorthand_keyword_arg_seq *, 13, "Shorthand keyword arguments are", t)
+    }
+
+shorthand_keyword_seq[asdl_shorthand_keyword_arg_seq*]: a[asdl_shorthand_keyword_arg_seq*]=','.shorthand_keyword_arg+ [','] { a }
+
+shorthand_keyword_arg[shorthand_keyword_arg_ty]:
+    | a=NAME '=' { _PyAST_shorthand_keyword_arg(a->v.Name.id) }
+
 # EXPRESSIONS
 # -----------
 
@@ -1004,7 +1017,6 @@ kwargs[asdl_seq*]:
     | a=','.kwarg_or_starred+ ',' b=','.kwarg_or_double_starred+ { _PyPegen_join_sequences(p, a, b) }
     | ','.kwarg_or_starred+
     | ','.kwarg_or_double_starred+
-
 starred_expression[expr_ty]:
     | invalid_starred_expression
     | '*' a=expression { _PyAST_Starred(a, Load, EXTRA) }
@@ -1014,6 +1026,7 @@ kwarg_or_starred[KeywordOrStarred*]:
     | a=NAME '=' b=expression {
         _PyPegen_keyword_or_starred(p, CHECK(keyword_ty, _PyAST_keyword(a->v.Name.id, b, EXTRA)), 1) }
     | a=starred_expression { _PyPegen_keyword_or_starred(p, a, 0) }
+    | '=' b=expression { _PyPegen_keyword_or_starred(p, b, 1)}
 
 kwarg_or_double_starred[KeywordOrStarred*]:
     | invalid_kwarg

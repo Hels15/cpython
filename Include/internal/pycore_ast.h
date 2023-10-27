@@ -41,6 +41,8 @@ typedef struct _arg *arg_ty;
 
 typedef struct _keyword *keyword_ty;
 
+typedef struct _shorthand_keyword_arg *shorthand_keyword_arg_ty;
+
 typedef struct _alias *alias_ty;
 
 typedef struct _withitem *withitem_ty;
@@ -111,6 +113,14 @@ typedef struct {
 } asdl_keyword_seq;
 
 asdl_keyword_seq *_Py_asdl_keyword_seq_new(Py_ssize_t size, PyArena *arena);
+
+typedef struct {
+    _ASDL_SEQ_HEAD
+    shorthand_keyword_arg_ty typed_elements[1];
+} asdl_shorthand_keyword_arg_seq;
+
+asdl_shorthand_keyword_arg_seq
+*_Py_asdl_shorthand_keyword_arg_seq_new(Py_ssize_t size, PyArena *arena);
 
 typedef struct {
     _ASDL_SEQ_HEAD
@@ -545,6 +555,7 @@ struct _arguments {
     asdl_expr_seq *kw_defaults;
     arg_ty kwarg;
     asdl_expr_seq *defaults;
+    asdl_shorthand_keyword_arg_seq *shorthand_keyword_args;
 };
 
 struct _arg {
@@ -560,6 +571,14 @@ struct _arg {
 struct _keyword {
     identifier arg;
     expr_ty value;
+    int lineno;
+    int col_offset;
+    int end_lineno;
+    int end_col_offset;
+};
+
+struct _shorthand_keyword_arg {
+    identifier arg;
     int lineno;
     int col_offset;
     int end_lineno;
@@ -853,13 +872,20 @@ excepthandler_ty _PyAST_ExceptHandler(expr_ty type, identifier name,
 arguments_ty _PyAST_arguments(asdl_arg_seq * posonlyargs, asdl_arg_seq * args,
                               arg_ty vararg, asdl_arg_seq * kwonlyargs,
                               asdl_expr_seq * kw_defaults, arg_ty kwarg,
-                              asdl_expr_seq * defaults, PyArena *arena);
+                              asdl_expr_seq * defaults,
+                              asdl_shorthand_keyword_arg_seq *
+                              shorthand_keyword_args, PyArena *arena);
 arg_ty _PyAST_arg(identifier arg, expr_ty annotation, string type_comment, int
                   lineno, int col_offset, int end_lineno, int end_col_offset,
                   PyArena *arena);
 keyword_ty _PyAST_keyword(identifier arg, expr_ty value, int lineno, int
                           col_offset, int end_lineno, int end_col_offset,
                           PyArena *arena);
+shorthand_keyword_arg_ty _PyAST_shorthand_keyword_arg(identifier arg, int
+                                                      lineno, int col_offset,
+                                                      int end_lineno, int
+                                                      end_col_offset, PyArena
+                                                      *arena);
 alias_ty _PyAST_alias(identifier name, identifier asname, int lineno, int
                       col_offset, int end_lineno, int end_col_offset, PyArena
                       *arena);

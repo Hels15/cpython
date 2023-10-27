@@ -252,6 +252,7 @@ static int symtable_visit_match_case(struct symtable *st, match_case_ty m);
 static int symtable_visit_pattern(struct symtable *st, pattern_ty s);
 static int symtable_raise_if_annotation_block(struct symtable *st, const char *, expr_ty);
 static int symtable_raise_if_comprehension_block(struct symtable *st, expr_ty);
+static int symtable_visit_short_hand_keyword(struct symtable *st, shorthand_keyword_arg_ty s);
 
 /* For debugging purposes only */
 #if _PY_DUMP_SYMTABLE

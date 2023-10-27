@@ -235,6 +235,8 @@ struct ast_state {
     PyObject *rest;
     PyObject *returns;
     PyObject *right;
+    PyObject *shorthand_keyword_arg_type;
+    PyObject *shorthand_keyword_args;
     PyObject *simple;
     PyObject *slice;
     PyObject *step;

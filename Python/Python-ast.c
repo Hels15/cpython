@@ -247,6 +247,8 @@ void _PyAST_Fini(PyInterpreterState *interp)
     Py_CLEAR(state->rest);
     Py_CLEAR(state->returns);
     Py_CLEAR(state->right);
+    Py_CLEAR(state->shorthand_keyword_arg_type);
+    Py_CLEAR(state->shorthand_keyword_args);
     Py_CLEAR(state->simple);
     Py_CLEAR(state->slice);
     Py_CLEAR(state->step);
@@ -350,6 +352,7 @@ static int init_identifiers(struct ast_state *state)
     if ((state->rest = PyUnicode_InternFromString("rest")) == NULL) return 0;
     if ((state->returns = PyUnicode_InternFromString("returns")) == NULL) return 0;
     if ((state->right = PyUnicode_InternFromString("right")) == NULL) return 0;
+    if ((state->shorthand_keyword_args = PyUnicode_InternFromString("shorthand_keyword_args")) == NULL) return 0;
     if ((state->simple = PyUnicode_InternFromString("simple")) == NULL) return 0;
     if ((state->slice = PyUnicode_InternFromString("slice")) == NULL) return 0;
     if ((state->step = PyUnicode_InternFromString("step")) == NULL) return 0;
@@ -377,6 +380,7 @@ GENERATE_ASDL_SEQ_CONSTRUCTOR(excepthandler, excepthandler_ty)
 GENERATE_ASDL_SEQ_CONSTRUCTOR(arguments, arguments_ty)
 GENERATE_ASDL_SEQ_CONSTRUCTOR(arg, arg_ty)
 GENERATE_ASDL_SEQ_CONSTRUCTOR(keyword, keyword_ty)
+GENERATE_ASDL_SEQ_CONSTRUCTOR(shorthand_keyword_arg, shorthand_keyword_arg_ty)
 GENERATE_ASDL_SEQ_CONSTRUCTOR(alias, alias_ty)
 GENERATE_ASDL_SEQ_CONSTRUCTOR(withitem, withitem_ty)
 GENERATE_ASDL_SEQ_CONSTRUCTOR(match_case, match_case_ty)
@@ -686,6 +690,7 @@ static const char * const arguments_fields[]={
     "kw_defaults",
     "kwarg",
     "defaults",
+    "shorthand_keyword_args",
 };
 static PyObject* ast2obj_arg(struct ast_state *state, void*);
 static const char * const arg_attributes[] = {
@@ -709,6 +714,16 @@ static const char * const keyword_attributes[] = {
 static const char * const keyword_fields[]={
     "arg",
     "value",
+};
+static PyObject* ast2obj_shorthand_keyword_arg(struct ast_state *state, void*);
+static const char * const shorthand_keyword_arg_attributes[] = {
+    "lineno",
+    "col_offset",
+    "end_lineno",
+    "end_col_offset",
+};
+static const char * const shorthand_keyword_arg_fields[]={
+    "arg",
 };
 static PyObject* ast2obj_alias(struct ast_state *state, void*);
 static const char * const alias_attributes[] = {
@@ -1765,8 +1780,8 @@ init_types(struct ast_state *state)
     if (PyObject_SetAttr(state->ExceptHandler_type, state->name, Py_None) == -1)
         return 0;
     state->arguments_type = make_type(state, "arguments", state->AST_type,
-                                      arguments_fields, 7,
-        "arguments(arg* posonlyargs, arg* args, arg? vararg, arg* kwonlyargs, expr* kw_defaults, arg? kwarg, expr* defaults)");
+                                      arguments_fields, 8,
+        "arguments(arg* posonlyargs, arg* args, arg? vararg, arg* kwonlyargs, expr* kw_defaults, arg? kwarg, expr* defaults, shorthand_keyword_arg* shorthand_keyword_args)");
     if (!state->arguments_type) return 0;
     if (!add_attributes(state, state->arguments_type, NULL, 0)) return 0;
     if (PyObject_SetAttr(state->arguments_type, state->vararg, Py_None) == -1)
@@ -1797,6 +1812,24 @@ init_types(struct ast_state *state)
         return 0;
     if (PyObject_SetAttr(state->keyword_type, state->end_col_offset, Py_None)
         == -1)
+        return 0;
+    state->shorthand_keyword_arg_type = make_type(state,
+                                                  "shorthand_keyword_arg",
+                                                  state->AST_type,
+                                                  shorthand_keyword_arg_fields,
+                                                  1,
+        "shorthand_keyword_arg(identifier? arg)");
+    if (!state->shorthand_keyword_arg_type) return 0;
+    if (!add_attributes(state, state->shorthand_keyword_arg_type,
+        shorthand_keyword_arg_attributes, 4)) return 0;
+    if (PyObject_SetAttr(state->shorthand_keyword_arg_type, state->arg,
+        Py_None) == -1)
+        return 0;
+    if (PyObject_SetAttr(state->shorthand_keyword_arg_type, state->end_lineno,
+        Py_None) == -1)
+        return 0;
+    if (PyObject_SetAttr(state->shorthand_keyword_arg_type,
+        state->end_col_offset, Py_None) == -1)
         return 0;
     state->alias_type = make_type(state, "alias", state->AST_type,
                                   alias_fields, 2,
@@ -1950,6 +1983,9 @@ static int obj2ast_arg(struct ast_state *state, PyObject* obj, arg_ty* out,
                        PyArena* arena);
 static int obj2ast_keyword(struct ast_state *state, PyObject* obj, keyword_ty*
                            out, PyArena* arena);
+static int obj2ast_shorthand_keyword_arg(struct ast_state *state, PyObject*
+                                         obj, shorthand_keyword_arg_ty* out,
+                                         PyArena* arena);
 static int obj2ast_alias(struct ast_state *state, PyObject* obj, alias_ty* out,
                          PyArena* arena);
 static int obj2ast_withitem(struct ast_state *state, PyObject* obj,
@@ -3408,8 +3444,9 @@ _PyAST_ExceptHandler(expr_ty type, identifier name, asdl_stmt_seq * body, int
 arguments_ty
 _PyAST_arguments(asdl_arg_seq * posonlyargs, asdl_arg_seq * args, arg_ty
                  vararg, asdl_arg_seq * kwonlyargs, asdl_expr_seq *
-                 kw_defaults, arg_ty kwarg, asdl_expr_seq * defaults, PyArena
-                 *arena)
+                 kw_defaults, arg_ty kwarg, asdl_expr_seq * defaults,
+                 asdl_shorthand_keyword_arg_seq * shorthand_keyword_args,
+                 PyArena *arena)
 {
     arguments_ty p;
     p = (arguments_ty)_PyArena_Malloc(arena, sizeof(*p));
@@ -3422,6 +3459,7 @@ _PyAST_arguments(asdl_arg_seq * posonlyargs, asdl_arg_seq * args, arg_ty
     p->kw_defaults = kw_defaults;
     p->kwarg = kwarg;
     p->defaults = defaults;
+    p->shorthand_keyword_args = shorthand_keyword_args;
     return p;
 }
 
@@ -3463,6 +3501,22 @@ _PyAST_keyword(identifier arg, expr_ty value, int lineno, int col_offset, int
         return NULL;
     p->arg = arg;
     p->value = value;
+    p->lineno = lineno;
+    p->col_offset = col_offset;
+    p->end_lineno = end_lineno;
+    p->end_col_offset = end_col_offset;
+    return p;
+}
+
+shorthand_keyword_arg_ty
+_PyAST_shorthand_keyword_arg(identifier arg, int lineno, int col_offset, int
+                             end_lineno, int end_col_offset, PyArena *arena)
+{
+    shorthand_keyword_arg_ty p;
+    p = (shorthand_keyword_arg_ty)_PyArena_Malloc(arena, sizeof(*p));
+    if (!p)
+        return NULL;
+    p->arg = arg;
     p->lineno = lineno;
     p->col_offset = col_offset;
     p->end_lineno = end_lineno;
@@ -5195,6 +5249,12 @@ ast2obj_arguments(struct ast_state *state, void* _o)
     if (PyObject_SetAttr(result, state->defaults, value) == -1)
         goto failed;
     Py_DECREF(value);
+    value = ast2obj_list(state, (asdl_seq*)o->shorthand_keyword_args,
+                         ast2obj_shorthand_keyword_arg);
+    if (!value) goto failed;
+    if (PyObject_SetAttr(result, state->shorthand_keyword_args, value) == -1)
+        goto failed;
+    Py_DECREF(value);
     state->recursion_depth--;
     return result;
 failed:
@@ -5288,6 +5348,56 @@ ast2obj_keyword(struct ast_state *state, void* _o)
     value = ast2obj_expr(state, o->value);
     if (!value) goto failed;
     if (PyObject_SetAttr(result, state->value, value) == -1)
+        goto failed;
+    Py_DECREF(value);
+    value = ast2obj_int(state, o->lineno);
+    if (!value) goto failed;
+    if (PyObject_SetAttr(result, state->lineno, value) < 0)
+        goto failed;
+    Py_DECREF(value);
+    value = ast2obj_int(state, o->col_offset);
+    if (!value) goto failed;
+    if (PyObject_SetAttr(result, state->col_offset, value) < 0)
+        goto failed;
+    Py_DECREF(value);
+    value = ast2obj_int(state, o->end_lineno);
+    if (!value) goto failed;
+    if (PyObject_SetAttr(result, state->end_lineno, value) < 0)
+        goto failed;
+    Py_DECREF(value);
+    value = ast2obj_int(state, o->end_col_offset);
+    if (!value) goto failed;
+    if (PyObject_SetAttr(result, state->end_col_offset, value) < 0)
+        goto failed;
+    Py_DECREF(value);
+    state->recursion_depth--;
+    return result;
+failed:
+    Py_XDECREF(value);
+    Py_XDECREF(result);
+    return NULL;
+}
+
+PyObject*
+ast2obj_shorthand_keyword_arg(struct ast_state *state, void* _o)
+{
+    shorthand_keyword_arg_ty o = (shorthand_keyword_arg_ty)_o;
+    PyObject *result = NULL, *value = NULL;
+    PyTypeObject *tp;
+    if (!o) {
+        Py_RETURN_NONE;
+    }
+    if (++state->recursion_depth > state->recursion_limit) {
+        PyErr_SetString(PyExc_RecursionError,
+            "maximum recursion depth exceeded during ast construction");
+        return 0;
+    }
+    tp = (PyTypeObject *)state->shorthand_keyword_arg_type;
+    result = PyType_GenericNew(tp, NULL, NULL);
+    if (!result) return NULL;
+    value = ast2obj_identifier(state, o->arg);
+    if (!value) goto failed;
+    if (PyObject_SetAttr(result, state->arg, value) == -1)
         goto failed;
     Py_DECREF(value);
     value = ast2obj_int(state, o->lineno);
@@ -11025,6 +11135,7 @@ obj2ast_arguments(struct ast_state *state, PyObject* obj, arguments_ty* out,
     asdl_expr_seq* kw_defaults;
     arg_ty kwarg;
     asdl_expr_seq* defaults;
+    asdl_shorthand_keyword_arg_seq* shorthand_keyword_args;
 
     if (PyObject_GetOptionalAttr(obj, state->posonlyargs, &tmp) < 0) {
         return 1;
@@ -11250,8 +11361,48 @@ obj2ast_arguments(struct ast_state *state, PyObject* obj, arguments_ty* out,
         }
         Py_CLEAR(tmp);
     }
+    if (PyObject_GetOptionalAttr(obj, state->shorthand_keyword_args, &tmp) < 0)
+        {
+        return 1;
+    }
+    if (tmp == NULL) {
+        tmp = PyList_New(0);
+        if (tmp == NULL) {
+            return 1;
+        }
+    }
+    {
+        int res;
+        Py_ssize_t len;
+        Py_ssize_t i;
+        if (!PyList_Check(tmp)) {
+            PyErr_Format(PyExc_TypeError, "arguments field \"shorthand_keyword_args\" must be a list, not a %.200s", _PyType_Name(Py_TYPE(tmp)));
+            goto failed;
+        }
+        len = PyList_GET_SIZE(tmp);
+        shorthand_keyword_args = _Py_asdl_shorthand_keyword_arg_seq_new(len,
+                                                                        arena);
+        if (shorthand_keyword_args == NULL) goto failed;
+        for (i = 0; i < len; i++) {
+            shorthand_keyword_arg_ty val;
+            PyObject *tmp2 = Py_NewRef(PyList_GET_ITEM(tmp, i));
+            if (_Py_EnterRecursiveCall(" while traversing 'arguments' node")) {
+                goto failed;
+            }
+            res = obj2ast_shorthand_keyword_arg(state, tmp2, &val, arena);
+            _Py_LeaveRecursiveCall();
+            Py_DECREF(tmp2);
+            if (res != 0) goto failed;
+            if (len != PyList_GET_SIZE(tmp)) {
+                PyErr_SetString(PyExc_RuntimeError, "arguments field \"shorthand_keyword_args\" changed size during iteration");
+                goto failed;
+            }
+            asdl_seq_SET(shorthand_keyword_args, i, val);
+        }
+        Py_CLEAR(tmp);
+    }
     *out = _PyAST_arguments(posonlyargs, args, vararg, kwonlyargs, kw_defaults,
-                            kwarg, defaults, arena);
+                            kwarg, defaults, shorthand_keyword_args, arena);
     if (*out == NULL) goto failed;
     return 0;
 failed:
@@ -11515,6 +11666,111 @@ obj2ast_keyword(struct ast_state *state, PyObject* obj, keyword_ty* out,
     }
     *out = _PyAST_keyword(arg, value, lineno, col_offset, end_lineno,
                           end_col_offset, arena);
+    if (*out == NULL) goto failed;
+    return 0;
+failed:
+    Py_XDECREF(tmp);
+    return 1;
+}
+
+int
+obj2ast_shorthand_keyword_arg(struct ast_state *state, PyObject* obj,
+                              shorthand_keyword_arg_ty* out, PyArena* arena)
+{
+    PyObject* tmp = NULL;
+    identifier arg;
+    int lineno;
+    int col_offset;
+    int end_lineno;
+    int end_col_offset;
+
+    if (PyObject_GetOptionalAttr(obj, state->arg, &tmp) < 0) {
+        return 1;
+    }
+    if (tmp == NULL || tmp == Py_None) {
+        Py_CLEAR(tmp);
+        arg = NULL;
+    }
+    else {
+        int res;
+        if (_Py_EnterRecursiveCall(" while traversing 'shorthand_keyword_arg' node")) {
+            goto failed;
+        }
+        res = obj2ast_identifier(state, tmp, &arg, arena);
+        _Py_LeaveRecursiveCall();
+        if (res != 0) goto failed;
+        Py_CLEAR(tmp);
+    }
+    if (PyObject_GetOptionalAttr(obj, state->lineno, &tmp) < 0) {
+        return 1;
+    }
+    if (tmp == NULL) {
+        PyErr_SetString(PyExc_TypeError, "required field \"lineno\" missing from shorthand_keyword_arg");
+        return 1;
+    }
+    else {
+        int res;
+        if (_Py_EnterRecursiveCall(" while traversing 'shorthand_keyword_arg' node")) {
+            goto failed;
+        }
+        res = obj2ast_int(state, tmp, &lineno, arena);
+        _Py_LeaveRecursiveCall();
+        if (res != 0) goto failed;
+        Py_CLEAR(tmp);
+    }
+    if (PyObject_GetOptionalAttr(obj, state->col_offset, &tmp) < 0) {
+        return 1;
+    }
+    if (tmp == NULL) {
+        PyErr_SetString(PyExc_TypeError, "required field \"col_offset\" missing from shorthand_keyword_arg");
+        return 1;
+    }
+    else {
+        int res;
+        if (_Py_EnterRecursiveCall(" while traversing 'shorthand_keyword_arg' node")) {
+            goto failed;
+        }
+        res = obj2ast_int(state, tmp, &col_offset, arena);
+        _Py_LeaveRecursiveCall();
+        if (res != 0) goto failed;
+        Py_CLEAR(tmp);
+    }
+    if (PyObject_GetOptionalAttr(obj, state->end_lineno, &tmp) < 0) {
+        return 1;
+    }
+    if (tmp == NULL || tmp == Py_None) {
+        Py_CLEAR(tmp);
+        end_lineno = lineno;
+    }
+    else {
+        int res;
+        if (_Py_EnterRecursiveCall(" while traversing 'shorthand_keyword_arg' node")) {
+            goto failed;
+        }
+        res = obj2ast_int(state, tmp, &end_lineno, arena);
+        _Py_LeaveRecursiveCall();
+        if (res != 0) goto failed;
+        Py_CLEAR(tmp);
+    }
+    if (PyObject_GetOptionalAttr(obj, state->end_col_offset, &tmp) < 0) {
+        return 1;
+    }
+    if (tmp == NULL || tmp == Py_None) {
+        Py_CLEAR(tmp);
+        end_col_offset = col_offset;
+    }
+    else {
+        int res;
+        if (_Py_EnterRecursiveCall(" while traversing 'shorthand_keyword_arg' node")) {
+            goto failed;
+        }
+        res = obj2ast_int(state, tmp, &end_col_offset, arena);
+        _Py_LeaveRecursiveCall();
+        if (res != 0) goto failed;
+        Py_CLEAR(tmp);
+    }
+    *out = _PyAST_shorthand_keyword_arg(arg, lineno, col_offset, end_lineno,
+                                        end_col_offset, arena);
     if (*out == NULL) goto failed;
     return 0;
 failed:
@@ -12983,6 +13239,10 @@ astmodule_exec(PyObject *m)
         return -1;
     }
     if (PyModule_AddObjectRef(m, "keyword", state->keyword_type) < 0) {
+        return -1;
+    }
+    if (PyModule_AddObjectRef(m, "shorthand_keyword_arg",
+        state->shorthand_keyword_arg_type) < 0) {
         return -1;
     }
     if (PyModule_AddObjectRef(m, "alias", state->alias_type) < 0) {
