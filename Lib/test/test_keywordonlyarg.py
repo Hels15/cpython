@@ -126,6 +126,29 @@ class KeywordOnlyArgTestCase(unittest.TestCase):
         self.assertEqual(['c','b','a'],
                          sortwords('a','c','b', reverse=True, ignore='ignore'))
 
+        # shorthand keyword args
+        k1 = 2
+        k2 = 1
+        k3 = 3
+        self.assertEqual(1, keywordonly_sum(k2=))
+        self.assertEqual(1 + 2, keywordonly_sum(k1=, k2=))
+
+        self.assertEqual(1 + 2, keywordonly_and_kwarg_sum(k1=, k2=))
+        self.assertEqual(1 + 2 + 3, keywordonly_and_kwarg_sum(k1=, k2=, k3=))
+        self.assertEqual(1 + 2 + 3 + 4,
+                         keywordonly_and_kwarg_sum(k1=, k2=,
+                                                   **{"a": 3, "b": 4}))
+        # mixed with args
+        self.assertEqual(1+2, mixedargs_sum(1, k1=))
+        self.assertEqual(1+2+3, mixedargs_sum(1, 2, 1, k1=))
+        self.assertEqual(1+2+3+4, mixedargs_sum(5, 2, k1=, k2=))
+        self.assertEqual(1+2+3+4+5, mixedargs_sum(7, 2, 3, k1=, k2=))
+
+        self.assertEqual(1+2, mixedargs_sum2(1, k1=))
+        self.assertEqual(1+2+3, mixedargs_sum2(1, 3, k1=))
+        self.assertEqual(1+2+3+4, mixedargs_sum2(1, 2, 3, k1=3, k2=))
+
+
     def testKwDefaults(self):
         def foo(p1,p2=0, *, k1, k2=0):
             return p1 + p2 + k1 + k2
@@ -139,6 +162,31 @@ class KeywordOnlyArgTestCase(unittest.TestCase):
         except TypeError:
             pass
 
+    def testShorthandKeywordArgs(self):
+        def foo(a, b):
+            return a+b
+
+        a = 12
+        b = 24
+
+        try:
+            foo(a=, b=)
+        except:
+            self.fail("shorthand keyword args are not supported")
+
+    def testShorthandKeywordArgsNameError(self):
+        def foo(a, b):
+            return a+b
+        b = 24
+
+        try:
+            foo(a=, b=)
+            self.fail("shorthand keyword args are not throwing NameError if the variable is not defined")
+
+        except NameError:
+            pass
+
+
     def test_kwonly_methods(self):
         class Example:
             def f(self, *, k1=1, k2=2):
@@ -147,6 +195,17 @@ class KeywordOnlyArgTestCase(unittest.TestCase):
         self.assertEqual(Example().f(k1=1, k2=2), (1, 2))
         self.assertEqual(Example.f(Example(), k1=1, k2=2), (1, 2))
         self.assertRaises(TypeError, Example.f, k1=1, k2=2)
+
+    def test_shorthand_keyword_args_methods(self):
+        class Example:
+            def f(self, k1, *, k2=2):
+                return k1, k2
+        k1 = 1
+        k2 = 2
+
+        self.assertEqual(Example().f(k1=, k2=), (1, 2))
+        self.assertEqual(Example.f(Example(), k1=, k2=), (1, 2))
+        self.assertRaises(TypeError, Example.f, k1=, k2=)
 
     def test_issue13343(self):
         # The Python compiler must scan all symbols of a function to
