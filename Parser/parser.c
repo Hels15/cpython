@@ -17649,7 +17649,7 @@ starred_expression_rule(Parser *p)
     return _res;
 }
 
-// kwarg_or_starred: invalid_kwarg | NAME '=' expression | starred_expression
+// kwarg_or_starred: invalid_kwarg | NAME '=' expression? | starred_expression
 static KeywordOrStarred*
 kwarg_or_starred_rule(Parser *p)
 {
@@ -17690,24 +17690,24 @@ kwarg_or_starred_rule(Parser *p)
         D(fprintf(stderr, "%*c%s kwarg_or_starred[%d-%d]: %s failed!\n", p->level, ' ',
                   p->error_indicator ? "ERROR!" : "-", _mark, p->mark, "invalid_kwarg"));
     }
-    { // NAME '=' expression
+    { // NAME '=' expression?
         if (p->error_indicator) {
             p->level--;
             return NULL;
         }
-        D(fprintf(stderr, "%*c> kwarg_or_starred[%d-%d]: %s\n", p->level, ' ', _mark, p->mark, "NAME '=' expression"));
+        D(fprintf(stderr, "%*c> kwarg_or_starred[%d-%d]: %s\n", p->level, ' ', _mark, p->mark, "NAME '=' expression?"));
         Token * _literal;
         expr_ty a;
-        expr_ty b;
+        void *b;
         if (
             (a = _PyPegen_name_token(p))  // NAME
             &&
             (_literal = _PyPegen_expect_token(p, 22))  // token='='
             &&
-            (b = expression_rule(p))  // expression
+            (b = expression_rule(p), !p->error_indicator)  // expression?
         )
         {
-            D(fprintf(stderr, "%*c+ kwarg_or_starred[%d-%d]: %s succeeded!\n", p->level, ' ', _mark, p->mark, "NAME '=' expression"));
+            D(fprintf(stderr, "%*c+ kwarg_or_starred[%d-%d]: %s succeeded!\n", p->level, ' ', _mark, p->mark, "NAME '=' expression?"));
             Token *_token = _PyPegen_get_last_nonnwhitespace_token(p);
             if (_token == NULL) {
                 p->level--;
@@ -17727,7 +17727,7 @@ kwarg_or_starred_rule(Parser *p)
         }
         p->mark = _mark;
         D(fprintf(stderr, "%*c%s kwarg_or_starred[%d-%d]: %s failed!\n", p->level, ' ',
-                  p->error_indicator ? "ERROR!" : "-", _mark, p->mark, "NAME '=' expression"));
+                  p->error_indicator ? "ERROR!" : "-", _mark, p->mark, "NAME '=' expression?"));
     }
     { // starred_expression
         if (p->error_indicator) {
@@ -17759,7 +17759,7 @@ kwarg_or_starred_rule(Parser *p)
     return _res;
 }
 
-// kwarg_or_double_starred: invalid_kwarg | NAME '=' expression | '**' expression
+// kwarg_or_double_starred: invalid_kwarg | NAME '=' expression? | '**' expression
 static KeywordOrStarred*
 kwarg_or_double_starred_rule(Parser *p)
 {
@@ -17800,24 +17800,24 @@ kwarg_or_double_starred_rule(Parser *p)
         D(fprintf(stderr, "%*c%s kwarg_or_double_starred[%d-%d]: %s failed!\n", p->level, ' ',
                   p->error_indicator ? "ERROR!" : "-", _mark, p->mark, "invalid_kwarg"));
     }
-    { // NAME '=' expression
+    { // NAME '=' expression?
         if (p->error_indicator) {
             p->level--;
             return NULL;
         }
-        D(fprintf(stderr, "%*c> kwarg_or_double_starred[%d-%d]: %s\n", p->level, ' ', _mark, p->mark, "NAME '=' expression"));
+        D(fprintf(stderr, "%*c> kwarg_or_double_starred[%d-%d]: %s\n", p->level, ' ', _mark, p->mark, "NAME '=' expression?"));
         Token * _literal;
         expr_ty a;
-        expr_ty b;
+        void *b;
         if (
             (a = _PyPegen_name_token(p))  // NAME
             &&
             (_literal = _PyPegen_expect_token(p, 22))  // token='='
             &&
-            (b = expression_rule(p))  // expression
+            (b = expression_rule(p), !p->error_indicator)  // expression?
         )
         {
-            D(fprintf(stderr, "%*c+ kwarg_or_double_starred[%d-%d]: %s succeeded!\n", p->level, ' ', _mark, p->mark, "NAME '=' expression"));
+            D(fprintf(stderr, "%*c+ kwarg_or_double_starred[%d-%d]: %s succeeded!\n", p->level, ' ', _mark, p->mark, "NAME '=' expression?"));
             Token *_token = _PyPegen_get_last_nonnwhitespace_token(p);
             if (_token == NULL) {
                 p->level--;
@@ -17837,7 +17837,7 @@ kwarg_or_double_starred_rule(Parser *p)
         }
         p->mark = _mark;
         D(fprintf(stderr, "%*c%s kwarg_or_double_starred[%d-%d]: %s failed!\n", p->level, ' ',
-                  p->error_indicator ? "ERROR!" : "-", _mark, p->mark, "NAME '=' expression"));
+                  p->error_indicator ? "ERROR!" : "-", _mark, p->mark, "NAME '=' expression?"));
     }
     { // '**' expression
         if (p->error_indicator) {

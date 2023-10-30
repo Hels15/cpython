@@ -5110,7 +5110,11 @@ compiler_subkwargs(struct compiler *c, location loc,
     if (n > 1 && !big) {
         for (i = begin; i < end; i++) {
             kw = asdl_seq_GET(keywords, i);
-            VISIT(c, expr, kw->value);
+            if (kw->value){
+                VISIT(c, expr, kw->value);
+            } else {
+                RETURN_IF_ERROR(compiler_nameop(c, loc, kw->arg, Load));
+            }
         }
         keys = PyTuple_New(n);
         if (keys == NULL) {
@@ -5130,7 +5134,11 @@ compiler_subkwargs(struct compiler *c, location loc,
     for (i = begin; i < end; i++) {
         kw = asdl_seq_GET(keywords, i);
         ADDOP_LOAD_CONST(c, loc, kw->arg);
-        VISIT(c, expr, kw->value);
+        if (kw->value) {
+            VISIT(c, expr, kw->value);
+        } else {
+            RETURN_IF_ERROR(compiler_nameop(c, loc, kw->arg, Load));
+        }
         if (big) {
             ADDOP_I(c, NO_LOCATION, MAP_ADD, 1);
         }
@@ -5241,6 +5249,7 @@ ex_call:
                     ADDOP_I(c, loc, BUILD_MAP, 0);
                     have_dict = 1;
                 }
+                assert(kw->value);
                 VISIT(c, expr, kw->value);
                 ADDOP_I(c, loc, DICT_MERGE, 1);
             }
@@ -5917,7 +5926,12 @@ compiler_dictcomp(struct compiler *c, expr_ty e)
 static int
 compiler_visit_keyword(struct compiler *c, keyword_ty k)
 {
-    VISIT(c, expr, k->value);
+    if (k->value){
+        VISIT(c, expr, k->value);
+    }
+    else{
+        RETURN_IF_ERROR(compiler_nameop(c, LOC(k), k->arg, Load)); // shorthand-keyword-argument
+    }
     return SUCCESS;
 }
 
