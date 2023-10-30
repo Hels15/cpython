@@ -1675,7 +1675,9 @@ class _Unparser(NodeVisitor):
         else:
             self.write(node.arg)
             self.write("=")
-        self.traverse(node.value)
+
+        if node.value:
+            self.traverse(node.value)
 
     def visit_Lambda(self, node):
         with self.require_parens(_Precedence.TEST, node):
