@@ -72,6 +72,18 @@ Glossary
            complex(3, 5)
            complex(*(3, 5))
 
+      * :dfn:`shorthand keyword argument`: an argument only consists of an
+        identifier in a function call or passed as a value in a dictionary preceded by
+        ``**``. For example in the following function call ``real`` is a shorthand keyword argument since
+        it only consists of a NAME and an equal sign::
+                real = "real"
+                complex(real=)
+
+        Here, ``real`` needs to be defined before the function call, and match
+        the name of the argument ``(real=)``. Please, note that
+        ``(real=)`` and ``(real=real)`` have the same meaning in python. The former called
+        a ``shorthand keyword argument`` while the latter is referred to as a ``keyword argument``.
+
       Arguments are assigned to the named local variables in a function body.
       See the :ref:`calls` section for the rules governing this assignment.
       Syntactically, any expression can be used to represent an argument; the
